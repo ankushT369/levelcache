@@ -105,9 +105,7 @@ void ht_free(ht_t *hashtable) {
     free(hashtable);
 }
 
-void ht_update(ht_t *hashtable, const char *key, const void *value, size_t value_len) {
-    ht_set(hashtable, key, value, value_len);
-}
+
 
 int ht_delete(ht_t *hashtable, const char *key) {
     unsigned int slot = hash(key);
