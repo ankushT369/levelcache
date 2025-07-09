@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Iinclude -Ivendor/leveldb/include -Wall -g
-LDFLAGS=-Lvendor/leveldb/build -lleveldb -lstdc++
+LDFLAGS=vendor/leveldb/build/libleveldb.a -lstdc++ -pthread
 
 SRC_DIR=src
 LIB_DIR=lib
