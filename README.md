@@ -41,3 +41,7 @@ To clean the build artifacts, run:
 ```bash
 make clean
 ```
+
+## Usage
+
+See the `examples` directory for usage examples.
