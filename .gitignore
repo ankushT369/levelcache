@@ -1,0 +1,17 @@
+# Binaries
+*.o
+*.a
+*.so
+*.exe
+*.out
+
+# Build directory
+build/
+bin/
+
+# Local configuration
+*.local
+
+# OS-specific
+.DS_Store
+Thumbs.db
