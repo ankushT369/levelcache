@@ -104,3 +104,31 @@ void ht_free(ht_t *hashtable) {
     free(hashtable->entries);
     free(hashtable);
 }
+
+void ht_update(ht_t *hashtable, const char *key, const void *value, size_t value_len) {
+    ht_set(hashtable, key, value, value_len);
+}
+
+int ht_delete(ht_t *hashtable, const char *key) {
+    unsigned int slot = hash(key);
+    entry_t *entry = hashtable->entries[slot];
+    entry_t *prev = NULL;
+
+    while (entry != NULL) {
+        if (strcmp(entry->key, key) == 0) {
+            if (prev == NULL) {
+                hashtable->entries[slot] = entry->next;
+            } else {
+                prev->next = entry->next;
+            }
+            free(entry->key);
+            free(entry->value);
+            free(entry);
+            return 0; // Found and deleted
+        }
+        prev = entry;
+        entry = entry->next;
+    }
+
+    return -1; // Not found
+}
