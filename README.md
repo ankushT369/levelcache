@@ -15,6 +15,7 @@ SplitCache is a simple in-memory key-value store, written in C. It is designed t
 
 - `gcc`
 - `make`
+- `libleveldb-dev` (Debian/Ubuntu)
 
 ## Building
 

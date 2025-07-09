@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-Iinclude -Wall -g
-LDFLAGS=
+CFLAGS=-Iinclude -I/home/arpit/workspace/2tlru/vendor/leveldb/include -Wall -g
+LDFLAGS=/home/arpit/workspace/2tlru/vendor/leveldb/libleveldb.a -pthread -lstdc++
 
 SRC_DIR=src
 LIB_DIR=lib
@@ -36,7 +36,7 @@ test: $(TEST_RUNNER)
 
 $(TEST_RUNNER): $(SRC_FILES) $(TEST_SRC_FILES)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)

@@ -3,12 +3,12 @@
 
 #include <stddef.h>
 
-typedef struct ht_t ht_t;
+typedef struct leveldb_t leveldb_t;
 
-ht_t *ht_create(void);
-void ht_free(ht_t *hashtable);
-void ht_set(ht_t *hashtable, const char *key, const void *value, size_t value_len);
-int ht_get(ht_t *hashtable, const char *key, void **value, size_t *value_len);
-int ht_delete(ht_t *hashtable, const char *key);
+leveldb_t* splitcache_open(const char *path);
+void splitcache_close(leveldb_t *db);
+int splitcache_put(leveldb_t *db, const char *key, const void *value, size_t value_len);
+int splitcache_get(leveldb_t *db, const char *key, void **value, size_t *value_len);
+int splitcache_delete(leveldb_t *db, const char *key);
 
 #endif // SPLITCACHE_H
