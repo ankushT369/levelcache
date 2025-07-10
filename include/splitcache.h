@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "uthash.h"
 #include "leveldb/c.h"
+#include "zmalloc.h"
 
 // Structure for in-memory cache entries
 typedef struct KeyMetadata {
