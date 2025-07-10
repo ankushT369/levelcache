@@ -1,6 +1,8 @@
 #include "splitcache.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <time.h>
 
 SplitCache* splitcache_open(const char *path) {
     SplitCache *cache = (SplitCache *) malloc(sizeof(SplitCache));
@@ -33,11 +35,10 @@ void splitcache_close(SplitCache *cache) {
         return;
     }
 
-    CacheEntry *current_entry, *tmp;
+    KeyMetadata *current_entry, *tmp;
     HASH_ITER(hh, cache->mcache, current_entry, tmp) {
         HASH_DEL(cache->mcache, current_entry);
-        free(current_entry->key);
-        free(current_entry->value);
+        free((void*)current_entry->hh.key);
         free(current_entry);
     }
 
@@ -52,31 +53,31 @@ int splitcache_put(SplitCache *cache, const char *key, const char *value) {
     char *err = NULL;
 
     // Add to LevelDB
-    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
+    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value) + 1, &err);
     if (err != NULL) {
         leveldb_free(err);
         return -1;
     }
 
     // Add to in-memory cache
-    CacheEntry *entry;
+    KeyMetadata *entry;
     HASH_FIND_STR(cache->mcache, key, entry);
     if (entry == NULL) {
-        entry = (CacheEntry*)malloc(sizeof(CacheEntry));
-        entry->key = strdup(key);
-        HASH_ADD_KEYPTR(hh, cache->mcache, entry->key, strlen(entry->key), entry);
+        entry = (KeyMetadata*)malloc(sizeof(KeyMetadata));
+        char *key_copy = strdup(key);
+        HASH_ADD_KEYPTR(hh, cache->mcache, key_copy, strlen(key_copy), entry);
     }
-    entry->value = strdup(value);
+    entry->lru = (uint32_t)time(NULL);
 
     return 0;
 }
 
 char* splitcache_get(SplitCache *cache, const char *key) {
-    CacheEntry *entry;
+    KeyMetadata *entry;
     HASH_FIND_STR(cache->mcache, key, entry);
 
     if (entry != NULL) {
-        return strdup(entry->value);
+        entry->lru = (uint32_t)time(NULL);
     }
 
     char *err = NULL;
@@ -89,24 +90,28 @@ char* splitcache_get(SplitCache *cache, const char *key) {
     }
 
     if (value_buffer != NULL) {
-        // Add to in-memory cache
-        entry = (CacheEntry*)malloc(sizeof(CacheEntry));
-        entry->key = strdup(key);
-        entry->value = strndup(value_buffer, value_len);
-        HASH_ADD_KEYPTR(hh, cache->mcache, entry->key, strlen(entry->key), entry);
+        char *result = strndup(value_buffer, value_len);
+        leveldb_free(value_buffer);
+
+        if (entry == NULL) {
+            entry = (KeyMetadata*)malloc(sizeof(KeyMetadata));
+            char *key_copy = strdup(key);
+            HASH_ADD_KEYPTR(hh, cache->mcache, key_copy, strlen(key_copy), entry);
+        }
+        entry->lru = (uint32_t)time(NULL);
+        return result;
     }
     
-    return value_buffer;
+    return NULL;
 }
 
 int splitcache_delete(SplitCache *cache, const char *key) {
     // Delete from in-memory cache
-    CacheEntry *entry;
+    KeyMetadata *entry;
     HASH_FIND_STR(cache->mcache, key, entry);
     if (entry != NULL) {
         HASH_DEL(cache->mcache, entry);
-        free(entry->key);
-        free(entry->value);
+        free((void*)entry->hh.key);
         free(entry);
     }
 
