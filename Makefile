@@ -19,6 +19,7 @@ SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
 OBJ_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 TEST_SRC_FILES = $(wildcard tests/*.c)
+TEST_OBJ_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(TEST_SRC_FILES))
 TEST_RUNNER = $(BIN_DIR)/test_runner
 
 .PHONY: all clean test leveldb
@@ -39,10 +40,9 @@ $(OBJ_DIR)/%.o: %.c
 test: leveldb $(LIB_TARGET) $(TEST_RUNNER)
 	./$(TEST_RUNNER)
 
-$(TEST_RUNNER): $(TEST_SRC_FILES)
+$(TEST_RUNNER): $(LIB_TARGET) $(TEST_OBJ_FILES)
 	@mkdir -p $(BIN_DIR)
-	$(CXX) $(CFLAGS) -o $@ $^ $(LIB_TARGET) $(LEVELDB_LIB) $(GTEST_LIB) $(GTEST_MAIN_LIB) $(LDFLAGS)
+	$(CXX) $(CFLAGS) -o $@ $(TEST_OBJ_FILES) $(LIB_TARGET) $(LEVELDB_LIB) $(GTEST_LIB) $(LDFLAGS)
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)
-	$(MAKE) -C vendor/leveldb clean
