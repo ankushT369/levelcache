@@ -5,10 +5,23 @@
 #include "uthash.h"
 #include "leveldb/c.h"
 
+// Structure for in-memory cache entries
+typedef struct CacheEntry {
+    char *key;
+    char *value;
+    UT_hash_handle hh;
+} CacheEntry;
+
 /**
  * @brief An opaque handle to the SplitCache database.
  */
-typedef struct SplitCache SplitCache;
+typedef struct SplitCache {
+    leveldb_t *db;
+    leveldb_options_t *options;
+    leveldb_readoptions_t *roptions;
+    leveldb_writeoptions_t *woptions;
+    CacheEntry *mcache;
+} SplitCache;
 
 /**
  * @brief Opens a SplitCache database at the specified path.
