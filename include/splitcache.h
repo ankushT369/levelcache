@@ -3,15 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "uthash.h"
 #include "leveldb/c.h"
-#include "zmalloc.h"
-
-// Structure for in-memory cache entries
-typedef struct KeyMetadata {
-    uint32_t lru;
-    UT_hash_handle hh;
-} KeyMetadata;
 
 /**
  * @brief An opaque handle to the SplitCache database.
@@ -21,19 +13,15 @@ typedef struct SplitCache {
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
-    KeyMetadata *mcache;
-    size_t max_memory;
-    size_t used_memory;
 } SplitCache;
 
 /**
  * @brief Opens a SplitCache database at the specified path.
  *
  * @param path The filesystem path to the database.
- * @param max_memory_mb The maximum memory capacity in megabytes.
  * @return A handle to the database, or NULL on error.
  */
-SplitCache* splitcache_open(const char *path, size_t max_memory_mb);
+SplitCache* splitcache_open(const char *path);
 
 /**
  * @brief Closes a SplitCache database.
@@ -48,9 +36,10 @@ void splitcache_close(SplitCache *cache);
  * @param cache The database handle.
  * @param key The key to store.
  * @param value The null-terminated string value to store.
+ * @param ttl_seconds The time-to-live in seconds. 0 means no TTL.
  * @return 0 on success, -1 on error.
  */
-int splitcache_put(SplitCache *cache, const char *key, const char *value);
+int splitcache_put(SplitCache *cache, const char *key, const char *value, uint32_t ttl_seconds);
 
 /**
  * @brief Retrieves a value from the database for a given key.
@@ -71,7 +60,5 @@ char* splitcache_get(SplitCache *cache, const char *key);
  * @return 0 on success, -1 on error.
  */
 int splitcache_delete(SplitCache *cache, const char *key);
-
-void splitcache_evict(SplitCache *cache);
 
 #endif // SPLITCACHE_H
