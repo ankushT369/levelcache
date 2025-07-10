@@ -1,6 +1,9 @@
 # SplitCache
 
-SplitCache is a key-value store C library built on top of Google's LevelDB. It provides a simple API for storing, retrieving, and deleting data, with added support for Time-to-Live (TTL) on keys and memory usage control for the underlying database cache.
+SplitCache is an embedded KV store C library built on top of [Google's LevelDB](https://github.com/google/leveldb).
+
+It provides a simple API for storing, retrieving, and deleting data, with added support for Time-to-Live (TTL)
+on keys and memory usage control for the underlying database cache.
 
 ## Prerequisites
 
@@ -58,3 +61,7 @@ The following numbers were captured on a 16-core machine with a 100MB database c
 |-----------|------------------------|-------------|-------------|-------------|-------------|
 | **Write** | ~262,000               | ~3.2 µs     | ~4.0 µs     | ~4.4 µs     | ~5.6 µs     |
 | **Read**  | ~593,000               | ~1.7 µs     | ~2.3 µs     | ~2.5 µs     | ~2.9 µs     |
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
