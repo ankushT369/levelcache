@@ -1,49 +1,48 @@
-CC=gcc
-CFLAGS=-Iinclude -Ivendor/leveldb/include -Ivendor -Wall -g
-LDFLAGS=vendor/leveldb/build/libleveldb.a -lstdc++ -pthread
+CC = gcc
+CXX = g++
+CFLAGS = -Iinclude -Ivendor/leveldb/include -Ivendor/googletest/googletest/include -Ivendor/uthash/src -Wall -g
+LDFLAGS = -lstdc++ -pthread
 
-SRC_DIR=src
-LIB_DIR=lib
-BIN_DIR=bin
-OBJ_DIR=build
+SRC_DIR = src
+LIB_DIR = lib
+BIN_DIR = bin
+OBJ_DIR = build
 
-LIB_NAME=libsplitcache.so
-LIB_TARGET=$(LIB_DIR)/$(LIB_NAME)
-LEVELDB_LIB=vendor/leveldb/build/libleveldb.a
+LIB_NAME = libsplitcache.a
+LIB_TARGET = $(LIB_DIR)/$(LIB_NAME)
 
-SRC_FILES=$(wildcard $(SRC_DIR)/*.c) vendor/ht.c
-OBJ_FILES=$(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
+LEVELDB_LIB = vendor/leveldb/libleveldb.a
+GTEST_LIB = vendor/leveldb/lib/libgtest.a
+GTEST_MAIN_LIB = vendor/leveldb/lib/libgtest_main.a
 
-TEST_SRC_FILES=$(wildcard tests/*.c)
-TEST_RUNNER=$(BIN_DIR)/test_runner
+SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
+OBJ_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
-.PHONY: all clean test vendor
+TEST_SRC_FILES = $(wildcard tests/*.c)
+TEST_RUNNER = $(BIN_DIR)/test_runner
+
+.PHONY: all clean test leveldb
 
 all: $(LIB_TARGET)
 
-vendor: $(LEVELDB_LIB)
+leveldb:
+	cd vendor/leveldb && cmake -DCMAKE_CXX_FLAGS=-fPIC . && make
 
-$(LEVELDB_LIB):
-	cd vendor/leveldb && mkdir -p build && cd build && cmake .. && cmake --build .
-
-# Build the shared library
-$(LIB_TARGET): $(OBJ_FILES) $(LEVELDB_LIB)
+$(LIB_TARGET): $(OBJ_FILES)
 	@mkdir -p $(LIB_DIR)
-	$(CC) -shared -o $@ $(filter-out $(OBJ_DIR)/vendor/ht.o,$(OBJ_FILES)) $(LDFLAGS)
+	ar rcs $@ $(OBJ_FILES)
 
-# Compile source files with -fPIC for the shared library
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build and run tests
-test: $(TEST_RUNNER)
+test: leveldb $(LIB_TARGET) $(TEST_RUNNER)
 	./$(TEST_RUNNER)
 
-$(TEST_RUNNER): $(SRC_FILES) $(TEST_SRC_FILES) $(LEVELDB_LIB)
+$(TEST_RUNNER): $(TEST_SRC_FILES)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LIB_TARGET) $(LEVELDB_LIB) $(GTEST_LIB) $(GTEST_MAIN_LIB) $(LDFLAGS)
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)
-	rm -rf vendor/leveldb/build
+	$(MAKE) -C vendor/leveldb clean

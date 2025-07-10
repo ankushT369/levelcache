@@ -2,6 +2,8 @@
 #define SPLITCACHE_H
 
 #include <stddef.h>
+#include "uthash.h"
+#include "leveldb/c.h"
 
 /**
  * @brief An opaque handle to the SplitCache database.
