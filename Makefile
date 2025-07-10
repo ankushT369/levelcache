@@ -15,8 +15,8 @@ LEVELDB_LIB = vendor/leveldb/libleveldb.a
 GTEST_LIB = vendor/leveldb/lib/libgtest.a
 GTEST_MAIN_LIB = vendor/leveldb/lib/libgtest_main.a
 
-SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
-OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/src/%.o,$(SRC_FILES))
+SRC_FILES = src/splitcache.c
+OBJ_FILES = $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(SRC_FILES))
 
 TEST_SRC_FILES = $(wildcard tests/*.c)
 TEST_OBJ_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(TEST_SRC_FILES))

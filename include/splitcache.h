@@ -13,15 +13,19 @@ typedef struct SplitCache {
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
+    leveldb_cache_t *lru_cache;
+    size_t max_memory_mb;
+    size_t used_memory_bytes;
 } SplitCache;
 
 /**
  * @brief Opens a SplitCache database at the specified path.
  *
  * @param path The filesystem path to the database.
+ * @param max_memory_mb The maximum memory capacity in megabytes.
  * @return A handle to the database, or NULL on error.
  */
-SplitCache* splitcache_open(const char *path);
+SplitCache* splitcache_open(const char *path, size_t max_memory_mb);
 
 /**
  * @brief Closes a SplitCache database.
