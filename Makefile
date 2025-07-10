@@ -33,11 +33,11 @@ BENCHMARK_RUNNER = $(BIN_DIR)/benchmark_runner
 
 .PHONY: all clean test leveldb benchmark
 
-all: $(LIB_TARGET)
+all: leveldb $(LIB_TARGET)
 
 leveldb:
 	@echo "Building leveldb and its dependencies..."
-	@cd vendor/leveldb && cmake -DCMAKE_CXX_FLAGS=-fPIC . > /dev/null && $(MAKE) --no-print-directory
+	@cd vendor/leveldb && cmake -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_FLAGS=-fPIC . > /dev/null && $(MAKE) --no-print-directory
 
 $(LIB_TARGET): $(OBJ_FILES)
 	@mkdir -p $(LIB_DIR)

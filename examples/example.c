@@ -69,10 +69,5 @@ int main() {
     // Close the database
     levelcache_close(cache);
 
-    // Clean up the database files for the example
-    char command[256];
-    snprintf(command, sizeof(command), "rm -rf %s", db_path);
-    system(command);
-
     return 0;
 }

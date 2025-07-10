@@ -14,63 +14,7 @@ LevelCache is a high-performance, embedded key-value caching library written in 
 
 ## Getting Started
 
-### 1. Clone the Repository
-
-This project uses git submodules for its dependencies. Clone the repository and initialize the submodules:
-
-```bash
-git clone https://github.com/arpitbbhayani/levelcache.git
-cd levelcache
-git submodule update --init --recursive
-```
-
-### 2. Build the Library
-
-To build the static library (`liblevelcache.a`), run:
-
-```bash
-make all
-```
-
-This will compile the source files and create the library in the `lib/` directory.
-
-## Usage Example
-
-Here is a simple example of how to use LevelCache in your C application:
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include "levelcache.h"
-
-int main() {
-    // Open the database with a 100MB cache
-    LevelCache* cache = levelcache_open("/tmp/my_cache_db", 100);
-    if (cache == NULL) {
-        fprintf(stderr, "Failed to open database.\n");
-        return 1;
-    }
-
-    // Store a value with a 60-second TTL
-    levelcache_put(cache, "my_key", "my_value", 60);
-    printf("Stored 'my_value' for key 'my_key'.\n");
-
-    // Retrieve the value
-    char* retrieved_value = levelcache_get(cache, "my_key");
-    if (retrieved_value != NULL) {
-        printf("Retrieved value: '%s'\n", retrieved_value);
-        free(retrieved_value); // Caller is responsible for freeing memory
-    } else {
-        printf("Key not found or expired.\n");
-    }
-
-    // Close the database
-    levelcache_close(cache);
-
-    return 0;
-}
-```
-For more detailed API documentation, please refer to the public header file at `include/levelcache.h`.
+Getting started with levelcache is simple and a step by step guide is documented in [examples](examples) directory.
 
 ## Makefile Targets
 
