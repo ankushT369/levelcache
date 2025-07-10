@@ -5,28 +5,17 @@
 #include <time.h>
 
 // Custom strdup to use zmalloc
-char *zstrdup(const char *s) {
+char *zstrdup(SplitCache *cache, const char *s) {
     size_t len = strlen(s) + 1;
-    char *p = zmalloc(len);
+    char *p = zmalloc(cache, len);
     if (p) {
         memcpy(p, s, len);
     }
     return p;
 }
 
-// Custom strndup to use zmalloc
-char *zstrndup(const char *s, size_t n) {
-    size_t len = strnlen(s, n);
-    char *p = zmalloc(len + 1);
-    if (p) {
-        memcpy(p, s, len);
-        p[len] = '\0';
-    }
-    return p;
-}
-
-SplitCache* splitcache_open(const char *path) {
-    SplitCache *cache = (SplitCache *) zmalloc(sizeof(SplitCache));
+SplitCache* splitcache_open(const char *path, size_t max_memory_mb) {
+    SplitCache *cache = (SplitCache *) malloc(sizeof(SplitCache));
     if (cache == NULL) {
         return NULL;
     }
@@ -40,13 +29,15 @@ SplitCache* splitcache_open(const char *path) {
     if (err != NULL) {
         leveldb_free(err);
         leveldb_options_destroy(cache->options);
-        zfree(cache);
+        free(cache);
         return NULL;
     }
 
     cache->roptions = leveldb_readoptions_create();
     cache->woptions = leveldb_writeoptions_create();
     cache->mcache = NULL;
+    cache->max_memory = max_memory_mb * 1024 * 1024;
+    cache->used_memory = 0;
 
     return cache;
 }
@@ -59,15 +50,15 @@ void splitcache_close(SplitCache *cache) {
     KeyMetadata *current_entry, *tmp;
     HASH_ITER(hh, cache->mcache, current_entry, tmp) {
         HASH_DEL(cache->mcache, current_entry);
-        zfree((void*)current_entry->hh.key);
-        zfree(current_entry);
+        zfree(cache, (void*)current_entry->hh.key);
+        zfree(cache, current_entry);
     }
 
     leveldb_close(cache->db);
     leveldb_options_destroy(cache->options);
     leveldb_readoptions_destroy(cache->roptions);
     leveldb_writeoptions_destroy(cache->woptions);
-    zfree(cache);
+    free(cache);
 }
 
 int splitcache_put(SplitCache *cache, const char *key, const char *value) {
@@ -84,8 +75,8 @@ int splitcache_put(SplitCache *cache, const char *key, const char *value) {
     KeyMetadata *entry;
     HASH_FIND_STR(cache->mcache, key, entry);
     if (entry == NULL) {
-        entry = (KeyMetadata*)zmalloc(sizeof(KeyMetadata));
-        char *key_copy = zstrdup(key);
+        entry = (KeyMetadata*)zmalloc(cache, sizeof(KeyMetadata));
+        char *key_copy = zstrdup(cache, key);
         HASH_ADD_KEYPTR(hh, cache->mcache, key_copy, strlen(key_copy), entry);
     }
     entry->lru = (uint32_t)time(NULL);
@@ -115,8 +106,8 @@ char* splitcache_get(SplitCache *cache, const char *key) {
         leveldb_free(value_buffer);
 
         if (entry == NULL) {
-            entry = (KeyMetadata*)zmalloc(sizeof(KeyMetadata));
-            char *key_copy = zstrdup(key);
+            entry = (KeyMetadata*)zmalloc(cache, sizeof(KeyMetadata));
+            char *key_copy = zstrdup(cache, key);
             HASH_ADD_KEYPTR(hh, cache->mcache, key_copy, strlen(key_copy), entry);
         }
         entry->lru = (uint32_t)time(NULL);
@@ -132,8 +123,8 @@ int splitcache_delete(SplitCache *cache, const char *key) {
     HASH_FIND_STR(cache->mcache, key, entry);
     if (entry != NULL) {
         HASH_DEL(cache->mcache, entry);
-        zfree((void*)entry->hh.key);
-        zfree(entry);
+        zfree(cache, (void*)entry->hh.key);
+        zfree(cache, entry);
     }
 
     // Delete from LevelDB
@@ -145,4 +136,20 @@ int splitcache_delete(SplitCache *cache, const char *key) {
     }
 
     return 0;
+}
+
+void splitcache_evict(SplitCache *cache) {
+    // For now, delete a few keys at random.
+    int count = 0;
+    KeyMetadata *current_entry, *tmp;
+    HASH_ITER(hh, cache->mcache, current_entry, tmp) {
+        if (count < 3) {
+            HASH_DEL(cache->mcache, current_entry);
+            zfree(cache, (void*)current_entry->hh.key);
+            zfree(cache, current_entry);
+            count++;
+        } else {
+            break;
+        }
+    }
 }

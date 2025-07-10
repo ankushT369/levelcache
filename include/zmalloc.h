@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 
-void *zmalloc(size_t size);
-void zfree(void *ptr);
-extern size_t used_memory;
+// We need a forward declaration of SplitCache here.
+struct SplitCache;
+
+void *zmalloc(struct SplitCache *cache, size_t size);
+void zfree(struct SplitCache *cache, void *ptr);
 
 #endif // ZMALLOC_H

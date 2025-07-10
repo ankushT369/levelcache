@@ -1,26 +1,29 @@
 #include "zmalloc.h"
+#include "splitcache.h"
 #include <stdlib.h>
 #include <string.h>
 
 #define PREFIX_SIZE sizeof(size_t)
 
-size_t used_memory = 0;
+void *zmalloc(SplitCache *cache, size_t size) {
+    if (cache->max_memory > 0 && cache->used_memory + size + PREFIX_SIZE > cache->max_memory) {
+        splitcache_evict(cache);
+    }
 
-void *zmalloc(size_t size) {
     void *ptr = malloc(size + PREFIX_SIZE);
     if (!ptr) return NULL;
 
     *((size_t*)ptr) = size;
-    used_memory += size + PREFIX_SIZE;
+    cache->used_memory += size + PREFIX_SIZE;
 
     return (char*)ptr + PREFIX_SIZE;
 }
 
-void zfree(void *ptr) {
+void zfree(SplitCache *cache, void *ptr) {
     if (ptr == NULL) return;
 
     void *real_ptr = (char*)ptr - PREFIX_SIZE;
     size_t old_size = *((size_t*)real_ptr);
-    used_memory -= old_size + PREFIX_SIZE;
+    cache->used_memory -= old_size + PREFIX_SIZE;
     free(real_ptr);
 }

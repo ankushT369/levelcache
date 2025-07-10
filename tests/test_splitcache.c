@@ -24,7 +24,7 @@ void teardown() {
 void test_put_and_get() {
     printf("Running test: test_put_and_get\n");
     setup();
-    SplitCache *cache = splitcache_open(DB_PATH);
+    SplitCache *cache = splitcache_open(DB_PATH, 0);
     assert(cache != NULL);
 
     const char *key = "test_key";
@@ -45,7 +45,7 @@ void test_put_and_get() {
 void test_get_non_existent() {
     printf("Running test: test_get_non_existent\n");
     setup();
-    SplitCache *cache = splitcache_open(DB_PATH);
+    SplitCache *cache = splitcache_open(DB_PATH, 0);
     assert(cache != NULL);
 
     const char *key = "non_existent_key";
@@ -60,7 +60,7 @@ void test_get_non_existent() {
 void test_delete() {
     printf("Running test: test_delete\n");
     setup();
-    SplitCache *cache = splitcache_open(DB_PATH);
+    SplitCache *cache = splitcache_open(DB_PATH, 0);
     assert(cache != NULL);
 
     const char *key = "test_key";
