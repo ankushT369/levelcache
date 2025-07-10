@@ -1,0 +1,9 @@
+[submodule "vendor/leveldb"]
+	path = vendor/leveldb
+	url = https://github.com/google/leveldb.git
+[submodule "vendor/googletest"]
+	path = vendor/googletest
+	url = https://github.com/google/googletest.git
+[submodule "vendor/uthash"]
+	path = vendor/uthash
+	url = https://github.com/troydhanson/uthash.git

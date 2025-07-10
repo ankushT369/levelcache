@@ -1,57 +1,50 @@
 # SplitCache
 
-SplitCache is a simple in-memory key-value store, written in C. It is designed to be integrated into other language runtimes and SDKs as a shared library.
+SplitCache is a key-value store C library built on top of Google's LevelDB. It provides a simple API for storing, retrieving, and deleting data, with added support for Time-to-Live (TTL) on keys and memory usage control for the underlying database cache.
 
 ## Structure
 
-- `src/`: Source files
-- `include/`: Header files
-- `lib/`: Shared library output
-- `tests/`: Test files
-- `vendor/`: Third-party libraries
-- `Makefile`: Build script
+- `src/`: Source files for the SplitCache library.
+- `include/`: Public header files.
+- `lib/`: Compiled static library output (`libsplitcache.a`).
+- `tests/`: Google Test suite for the library.
+- `vendor/`: Third-party libraries (LevelDB, Google Test).
+- `examples/`: Example usage of the library.
+- `Makefile`: Build script for the library and tests.
 
 ## Prerequisites
 
 - `gcc`
 - `g++`
 - `make`
+- `cmake` (for building LevelDB)
 
 ## Building
 
-Fetch all the dependencies
+First, fetch the required dependencies. This project uses git submodules for its dependencies.
 
 ```bash
-mkdir -p vendor
-git clone https://github.com/google/googletest.git vendor/googletest
-git clone https://github.com/troydhanson/uthash.git vendor/uthash
-git clone https://github.com/google/leveldb.git vendor/leveldb
+git submodule update --init --recursive
 ```
 
-To build the shared library, run:
+To build the static library (`libsplitcache.a`), run:
 
 ```bash
 make all
 ```
 
-This will create `lib/libsplitcache.so`.
+This will compile the source files and create the library in the `lib/` directory.
 
-## Testing
+## Makefile Targets
 
-To build and run the tests, run:
+The `Makefile` provides the following targets:
 
-```bash
-make test
-```
-
-## Cleaning
-
-To clean the build artifacts, run:
-
-```bash
-make clean
-```
+- `all`: Builds the `libsplitcache.a` static library.
+- `test`: Builds and runs the Google Test suite.
+- `clean`: Removes all build artifacts.
 
 ## Usage
 
-See the `examples` directory for usage examples.
+For detailed API usage, please refer to the public header file at `include/splitcache.h` and the implementation in `src/splitcache.c`.
+
+A practical demonstration is available in `examples/example.c`.
