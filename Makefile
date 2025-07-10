@@ -27,7 +27,8 @@ TEST_RUNNER = $(BIN_DIR)/test_runner
 all: $(LIB_TARGET)
 
 leveldb:
-	cd vendor/leveldb && cmake -DCMAKE_CXX_FLAGS=-fPIC . && make
+	@echo "Building leveldb..."
+	@cd vendor/leveldb && cmake -DCMAKE_CXX_FLAGS=-fPIC . > /dev/null && $(MAKE) --no-print-directory
 
 $(LIB_TARGET): $(OBJ_FILES)
 	@mkdir -p $(LIB_DIR)
@@ -46,3 +47,5 @@ $(TEST_RUNNER): $(LIB_TARGET) $(TEST_OBJ_FILES)
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)
+	@echo "Cleaning leveldb..."
+	@$(MAKE) -C vendor/leveldb clean --no-print-directory
