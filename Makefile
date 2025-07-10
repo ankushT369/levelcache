@@ -9,18 +9,18 @@ LIB_DIR = lib
 BIN_DIR = bin
 OBJ_DIR = build
 
-LIB_NAME = libsplitcache.a
+LIB_NAME = liblevelcache.a
 LIB_TARGET = $(LIB_DIR)/$(LIB_NAME)
 
 LEVELDB_LIB = vendor/leveldb/libleveldb.a
 
-SRC_FILES = src/splitcache.c
+SRC_FILES = src/levelcache.c
 OBJ_FILES = $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(SRC_FILES))
 
 GTEST_SRC_FILES = vendor/googletest/googletest/src/gtest-all.cc vendor/googletest/googletest/src/gtest_main.cc
 GTEST_OBJ_FILES = $(patsubst vendor/googletest/googletest/src/%.cc,$(OBJ_DIR)/vendor/googletest/googletest/src/%.o,$(GTEST_SRC_FILES))
 
-TEST_SRC_FILES = tests/gtest_splitcache.cpp
+TEST_SRC_FILES = tests/gtest_levelcache.cpp
 TEST_OBJ_FILES = $(patsubst tests/%.cpp,$(OBJ_DIR)/tests/%.o,$(TEST_SRC_FILES))
 TEST_RUNNER = $(BIN_DIR)/test_runner
 

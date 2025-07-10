@@ -1,11 +1,11 @@
-#include "splitcache.h"
+#include "levelcache.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
 
-SplitCache* splitcache_open(const char *path, size_t max_memory_mb) {
-    SplitCache *cache = (SplitCache *) malloc(sizeof(SplitCache));
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
+    LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
     if (cache == NULL) {
         return NULL;
     }
@@ -44,7 +44,7 @@ SplitCache* splitcache_open(const char *path, size_t max_memory_mb) {
     return cache;
 }
 
-void splitcache_close(SplitCache *cache) {
+void levelcache_close(LevelCache *cache) {
     if (cache == NULL) {
         return;
     }
@@ -59,7 +59,7 @@ void splitcache_close(SplitCache *cache) {
     free(cache);
 }
 
-int splitcache_put(SplitCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
+int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
     char *err = NULL;
     
     size_t value_len = strlen(value);
@@ -81,7 +81,7 @@ int splitcache_put(SplitCache *cache, const char *key, const char *value, uint32
     return 0;
 }
 
-char* splitcache_get(SplitCache *cache, const char *key) {
+char* levelcache_get(LevelCache *cache, const char *key) {
     char *err = NULL;
     size_t value_len;
     char *value_buffer = leveldb_get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
@@ -100,7 +100,7 @@ char* splitcache_get(SplitCache *cache, const char *key) {
 
     if (expiration > 0 && time(NULL) > expiration) {
         leveldb_free(value_buffer);
-        splitcache_delete(cache, key);
+        levelcache_delete(cache, key);
         return NULL;
     }
 
@@ -112,7 +112,7 @@ char* splitcache_get(SplitCache *cache, const char *key) {
     return result;
 }
 
-int splitcache_delete(SplitCache *cache, const char *key) {
+int levelcache_delete(LevelCache *cache, const char *key) {
     char *err = NULL;
     leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
     if (err != NULL) {

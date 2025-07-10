@@ -1,14 +1,14 @@
-#ifndef SPLITCACHE_H
-#define SPLITCACHE_H
+#ifndef LEVELCACHE_H
+#define LEVELCACHE_H
 
 #include <stddef.h>
 #include <stdint.h>
 #include "leveldb/c.h"
 
 /**
- * @brief An opaque handle to the SplitCache database.
+ * @brief An opaque handle to the LevelCache database.
  */
-typedef struct SplitCache {
+typedef struct LevelCache {
     leveldb_t *db;
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
@@ -16,23 +16,23 @@ typedef struct SplitCache {
     leveldb_cache_t *lru_cache;
     size_t max_memory_mb;
     size_t used_memory_bytes;
-} SplitCache;
+} LevelCache;
 
 /**
- * @brief Opens a SplitCache database at the specified path.
+ * @brief Opens a LevelCache database at the specified path.
  *
  * @param path The filesystem path to the database.
  * @param max_memory_mb The maximum memory capacity in megabytes.
  * @return A handle to the database, or NULL on error.
  */
-SplitCache* splitcache_open(const char *path, size_t max_memory_mb);
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb);
 
 /**
- * @brief Closes a SplitCache database.
+ * @brief Closes a LevelCache database.
  *
  * @param cache The database handle.
  */
-void splitcache_close(SplitCache *cache);
+void levelcache_close(LevelCache *cache);
 
 /**
  * @brief Stores a key-value pair in the database.
@@ -43,7 +43,7 @@ void splitcache_close(SplitCache *cache);
  * @param ttl_seconds The time-to-live in seconds. 0 means no TTL.
  * @return 0 on success, -1 on error.
  */
-int splitcache_put(SplitCache *cache, const char *key, const char *value, uint32_t ttl_seconds);
+int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds);
 
 /**
  * @brief Retrieves a value from the database for a given key.
@@ -54,7 +54,7 @@ int splitcache_put(SplitCache *cache, const char *key, const char *value, uint32
  * @param key The key to retrieve.
  * @return A pointer to a null-terminated string, or NULL if the key is not found or an error occurs.
  */
-char* splitcache_get(SplitCache *cache, const char *key);
+char* levelcache_get(LevelCache *cache, const char *key);
 
 /**
  * @brief Deletes a key-value pair from the database.
@@ -63,6 +63,6 @@ char* splitcache_get(SplitCache *cache, const char *key);
  * @param key The key to delete.
  * @return 0 on success, -1 on error.
  */
-int splitcache_delete(SplitCache *cache, const char *key);
+int levelcache_delete(LevelCache *cache, const char *key);
 
-#endif // SPLITCACHE_H
+#endif // LEVELCACHE_H

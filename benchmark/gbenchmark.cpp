@@ -7,10 +7,10 @@
 #include <numeric>
 
 extern "C" {
-#include "splitcache.h"
+#include "levelcache.h"
 }
 
-const char* DB_PATH_BENCH = "/tmp/splitcache_gbenchmark_db";
+const char* DB_PATH_BENCH = "/tmp/levelcache_gbenchmark_db";
 
 // Helper to generate random strings
 static void generate_random_string(char *str, size_t size) {
@@ -25,9 +25,9 @@ static void generate_random_string(char *str, size_t size) {
     }
 }
 
-class SplitCacheBenchmark : public benchmark::Fixture {
+class LevelCacheBenchmark : public benchmark::Fixture {
 public:
-    SplitCache* cache = nullptr;
+    LevelCache* cache = nullptr;
     std::vector<std::string> keys;
 
     void SetUp(const ::benchmark::State& state) override {
@@ -36,7 +36,7 @@ public:
             char command[256];
             snprintf(command, sizeof(command), "rm -rf %s", DB_PATH_BENCH);
             system(command);
-            cache = splitcache_open(DB_PATH_BENCH, 100); // 100 MB cache
+            cache = levelcache_open(DB_PATH_BENCH, 100); // 100 MB cache
             if (!cache) {
                 // This is a fatal error for the benchmark suite.
                 // We use a raw fprintf and exit because this setup is outside the benchmark run state.
@@ -51,7 +51,7 @@ public:
                 char val_buf[128];
                 generate_random_string(key_buf, sizeof(key_buf));
                 generate_random_string(val_buf, sizeof(val_buf));
-                splitcache_put(cache, key_buf, val_buf, 0);
+                levelcache_put(cache, key_buf, val_buf, 0);
                 keys.push_back(key_buf);
             }
         }
@@ -59,7 +59,7 @@ public:
 
     void TearDown(const ::benchmark::State& state) override {
         if (state.thread_index() == 0 && cache != nullptr) {
-            splitcache_close(cache);
+            levelcache_close(cache);
             cache = nullptr;
             char command[256];
             snprintf(command, sizeof(command), "rm -rf %s", DB_PATH_BENCH);
@@ -68,7 +68,7 @@ public:
     }
 };
 
-BENCHMARK_F(SplitCacheBenchmark, BM_Write)(benchmark::State& state) {
+BENCHMARK_F(LevelCacheBenchmark, BM_Write)(benchmark::State& state) {
     char key[32];
     char value[128];
     std::vector<double> latencies;
@@ -81,7 +81,7 @@ BENCHMARK_F(SplitCacheBenchmark, BM_Write)(benchmark::State& state) {
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
         
-        if (splitcache_put(cache, key, value, 0) != 0) {
+        if (levelcache_put(cache, key, value, 0) != 0) {
             state.SkipWithError("Put failed");
         }
         
@@ -97,7 +97,7 @@ BENCHMARK_F(SplitCacheBenchmark, BM_Write)(benchmark::State& state) {
     state.SetItemsProcessed(state.iterations());
 }
 
-BENCHMARK_F(SplitCacheBenchmark, BM_Read)(benchmark::State& state) {
+BENCHMARK_F(LevelCacheBenchmark, BM_Read)(benchmark::State& state) {
     if (keys.empty()) {
         state.SkipWithError("No keys to read");
         return;
@@ -111,7 +111,7 @@ BENCHMARK_F(SplitCacheBenchmark, BM_Read)(benchmark::State& state) {
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
 
-        char* val = splitcache_get(cache, key.c_str());
+        char* val = levelcache_get(cache, key.c_str());
         
         clock_gettime(CLOCK_MONOTONIC, &end);
         latencies.push_back((end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec));
