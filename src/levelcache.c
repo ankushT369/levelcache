@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include "leveldb/c.h"
 
 LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
     LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
@@ -11,6 +12,17 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
     }
     
     char *err = NULL;
+
+    // Destroy the existing database if it exists
+    leveldb_options_t* destroy_options = leveldb_options_create();
+    leveldb_destroy_db(destroy_options, path, &err);
+    leveldb_options_destroy(destroy_options);
+    if (err != NULL) {
+        // This is not a fatal error, maybe the db didn't exist.
+        // We can log this if we have a logging mechanism.
+        leveldb_free(err);
+        err = NULL; 
+    }
 
     cache->options = leveldb_options_create();
     leveldb_options_set_create_if_missing(cache->options, 1);

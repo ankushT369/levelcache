@@ -1,8 +1,8 @@
-# LevelCache: An Embedded Caching Library
+# LevelCache
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-LevelCache is a high-performance, embedded key-value caching library written in C. It is built on top of Google's [LevelDB](https://github.com/google/leveldb) storage engine and provides a simple, clean API for caching with Time-to-Live (TTL) support.
+LevelCache is a high-performance, ephemeral, embedded key-value caching library written in C. It is built on top of Google's [LevelDB](https://github.com/google/leveldb) and provides a simple, clean API for caching with Time-to-Live (TTL) support.
 
 ## Features
 
