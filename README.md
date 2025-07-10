@@ -31,8 +31,8 @@ To run the benchmarks on your own machine, use `make benchmark`.
 
 | Operation | Throughput (ops/sec) | p50 Latency | p90 Latency | p95 Latency | p99 Latency |
 |-----------|------------------------|-------------|-------------|-------------|-------------|
-| **Write** | ~262,000               | ~3.2 µs     | ~4.0 µs     | ~4.4 µs     | ~5.6 µs     |
-| **Read**  | ~593,000               | ~1.7 µs     | ~2.3 µs     | ~2.5 µs     | ~2.9 µs     |
+| **Write** | ~271,000               | ~3.1 µs     | ~3.8 µs     | ~4.2 µs     | ~5.3 µs     |
+| **Read**  | ~638,000               | ~1.6 µs     | ~2.1 µs     | ~2.3 µs     | ~2.8 µs     |
 
 ## Contributing
 

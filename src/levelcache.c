@@ -29,7 +29,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
 
     cache->max_memory_mb = max_memory_mb;
     if (cache->max_memory_mb > 0) {
-        size_t cache_size = cache->max_memory_mb * 1024 * 1024 / 2;
+        size_t cache_size = cache->max_memory_mb * 1024 * 1024;
         cache->lru_cache = leveldb_cache_create_lru(cache_size);
         leveldb_options_set_cache(cache->options, cache->lru_cache);
         cache->used_memory_bytes = cache_size;
