@@ -24,23 +24,20 @@ void teardown() {
 void test_put_and_get() {
     printf("Running test: test_put_and_get\n");
     setup();
-    leveldb_t *db = splitcache_open(DB_PATH);
-    assert(db != NULL);
+    SplitCache *cache = splitcache_open(DB_PATH);
+    assert(cache != NULL);
 
     const char *key = "test_key";
     const char *value = "test_value";
 
-    assert(splitcache_put(db, key, value, strlen(value) + 1) == 0);
+    assert(splitcache_put(cache, key, value) == 0);
 
-    void *retrieved_value = NULL;
-    size_t retrieved_len = 0;
-
-    assert(splitcache_get(db, key, &retrieved_value, &retrieved_len) == 0);
-    assert(strcmp((char*)retrieved_value, value) == 0);
-    assert(retrieved_len == strlen(value) + 1);
+    char *retrieved_value = splitcache_get(cache, key);
+    assert(retrieved_value != NULL);
+    assert(strcmp(retrieved_value, value) == 0);
 
     free(retrieved_value);
-    splitcache_close(db);
+    splitcache_close(cache);
     teardown();
     printf("PASSED\n");
 }
@@ -48,17 +45,14 @@ void test_put_and_get() {
 void test_get_non_existent() {
     printf("Running test: test_get_non_existent\n");
     setup();
-    leveldb_t *db = splitcache_open(DB_PATH);
-    assert(db != NULL);
+    SplitCache *cache = splitcache_open(DB_PATH);
+    assert(cache != NULL);
 
     const char *key = "non_existent_key";
-    void *retrieved_value = NULL;
-    size_t retrieved_len = 0;
-
-    assert(splitcache_get(db, key, &retrieved_value, &retrieved_len) == -1);
+    char *retrieved_value = splitcache_get(cache, key);
     assert(retrieved_value == NULL);
 
-    splitcache_close(db);
+    splitcache_close(cache);
     teardown();
     printf("PASSED\n");
 }
@@ -66,22 +60,19 @@ void test_get_non_existent() {
 void test_delete() {
     printf("Running test: test_delete\n");
     setup();
-    leveldb_t *db = splitcache_open(DB_PATH);
-    assert(db != NULL);
+    SplitCache *cache = splitcache_open(DB_PATH);
+    assert(cache != NULL);
 
     const char *key = "test_key";
     const char *value = "test_value";
 
-    assert(splitcache_put(db, key, value, strlen(value) + 1) == 0);
-    assert(splitcache_delete(db, key) == 0);
+    assert(splitcache_put(cache, key, value) == 0);
+    assert(splitcache_delete(cache, key) == 0);
 
-    void *retrieved_value = NULL;
-    size_t retrieved_len = 0;
-
-    assert(splitcache_get(db, key, &retrieved_value, &retrieved_len) == -1);
+    char *retrieved_value = splitcache_get(cache, key);
     assert(retrieved_value == NULL);
 
-    splitcache_close(db);
+    splitcache_close(cache);
     teardown();
     printf("PASSED\n");
 }

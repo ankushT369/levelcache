@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Iinclude -Ivendor/leveldb/include -Wall -g
+CFLAGS=-Iinclude -Ivendor/leveldb/include -Ivendor -Wall -g
 LDFLAGS=vendor/leveldb/build/libleveldb.a -lstdc++ -pthread
 
 SRC_DIR=src
@@ -11,8 +11,8 @@ LIB_NAME=libsplitcache.so
 LIB_TARGET=$(LIB_DIR)/$(LIB_NAME)
 LEVELDB_LIB=vendor/leveldb/build/libleveldb.a
 
-SRC_FILES=$(wildcard $(SRC_DIR)/*.c)
-OBJ_FILES=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
+SRC_FILES=$(wildcard $(SRC_DIR)/*.c) vendor/ht.c
+OBJ_FILES=$(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 
 TEST_SRC_FILES=$(wildcard tests/*.c)
 TEST_RUNNER=$(BIN_DIR)/test_runner
@@ -29,11 +29,11 @@ $(LEVELDB_LIB):
 # Build the shared library
 $(LIB_TARGET): $(OBJ_FILES) $(LEVELDB_LIB)
 	@mkdir -p $(LIB_DIR)
-	$(CC) -shared -o $@ $(OBJ_FILES) $(LDFLAGS)
+	$(CC) -shared -o $@ $(filter-out $(OBJ_DIR)/vendor/ht.o,$(OBJ_FILES)) $(LDFLAGS)
 
 # Compile source files with -fPIC for the shared library
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(OBJ_DIR)
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
 # Build and run tests

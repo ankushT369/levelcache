@@ -7,8 +7,8 @@ int main() {
     const char* db_path = "/tmp/splitcache_example_db";
 
     // Open the database
-    leveldb_t* db = splitcache_open(db_path);
-    if (db == NULL) {
+    SplitCache* cache = splitcache_open(db_path);
+    if (cache == NULL) {
         fprintf(stderr, "Failed to open database.\n");
         return 1;
     }
@@ -16,25 +16,24 @@ int main() {
     // Put a key-value pair
     const char* key = "hello";
     const char* value = "world";
-    if (splitcache_put(db, key, value, strlen(value)) != 0) {
+    if (splitcache_put(cache, key, value) != 0) {
         fprintf(stderr, "Failed to put value.\n");
-        splitcache_close(db);
+        splitcache_close(cache);
         return 1;
     }
     printf("Stored value: '%s' for key: '%s'\n", value, key);
 
     // Get the value
-    void* read_value = NULL;
-    size_t read_len;
-    if (splitcache_get(db, key, &read_value, &read_len) == 0) {
-        printf("Retrieved value: '%.*s'\n", (int)read_len, (char*)read_value);
-        free(read_value); // Important: free the memory allocated by splitcache_get
+    char* retrieved_value = splitcache_get(cache, key);
+    if (retrieved_value != NULL) {
+        printf("Retrieved value: '%s'\n", retrieved_value);
+        free(retrieved_value); // Important: free the memory allocated by splitcache_get
     } else {
         printf("Key not found.\n");
     }
 
     // Close the database
-    splitcache_close(db);
+    splitcache_close(cache);
 
     // Clean up the database files for the example
     char command[256];

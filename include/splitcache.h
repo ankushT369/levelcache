@@ -4,54 +4,53 @@
 #include <stddef.h>
 
 /**
- * @brief An opaque handle to the LevelDB database.
+ * @brief An opaque handle to the SplitCache database.
  */
-typedef struct leveldb_t leveldb_t;
+typedef struct SplitCache SplitCache;
 
 /**
- * @brief Opens a LevelDB database at the specified path.
+ * @brief Opens a SplitCache database at the specified path.
  *
  * @param path The filesystem path to the database.
  * @return A handle to the database, or NULL on error.
  */
-leveldb_t* splitcache_open(const char *path);
+SplitCache* splitcache_open(const char *path);
 
 /**
- * @brief Closes a LevelDB database.
+ * @brief Closes a SplitCache database.
  *
- * @param db The database handle.
+ * @param cache The database handle.
  */
-void splitcache_close(leveldb_t *db);
+void splitcache_close(SplitCache *cache);
 
 /**
  * @brief Stores a key-value pair in the database.
  *
- * @param db The database handle.
+ * @param cache The database handle.
  * @param key The key to store.
- * @param value A pointer to the value data.
- * @param value_len The length of the value data.
+ * @param value The null-terminated string value to store.
  * @return 0 on success, -1 on error.
  */
-int splitcache_put(leveldb_t *db, const char *key, const void *value, size_t value_len);
+int splitcache_put(SplitCache *cache, const char *key, const char *value);
 
 /**
  * @brief Retrieves a value from the database for a given key.
  *
- * @param db The database handle.
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param cache The database handle.
  * @param key The key to retrieve.
- * @param value A pointer to a variable that will be allocated and filled with the value data. The caller is responsible for freeing this memory.
- * @param value_len A pointer to a variable that will be filled with the length of the value data.
- * @return 0 on success, -1 if the key is not found or an error occurs.
+ * @return A pointer to a null-terminated string, or NULL if the key is not found or an error occurs.
  */
-int splitcache_get(leveldb_t *db, const char *key, void **value, size_t *value_len);
+char* splitcache_get(SplitCache *cache, const char *key);
 
 /**
  * @brief Deletes a key-value pair from the database.
  *
- * @param db The database handle.
+ * @param cache The database handle.
  * @param key The key to delete.
  * @return 0 on success, -1 on error.
  */
-int splitcache_delete(leveldb_t *db, const char *key);
+int splitcache_delete(SplitCache *cache, const char *key);
 
 #endif // SPLITCACHE_H
