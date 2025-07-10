@@ -71,7 +71,7 @@ $(TEST_RUNNER): $(LIB_TARGET) $(GTEST_OBJ_FILES) $(TEST_OBJ_FILES)
 	$(CXX) $(CXXFLAGS) -o $@ $(GTEST_OBJ_FILES) $(TEST_OBJ_FILES) $(LIB_TARGET) $(LEVELDB_LIB) $(LDFLAGS)
 
 benchmark: leveldb $(LIB_TARGET) $(BENCHMARK_RUNNER)
-	./$(BENCHMARK_RUNNER) --benchmark_min_time=2 --benchmark_repetitions=3 --benchmark_display_aggregates_only=true
+	./$(BENCHMARK_RUNNER) --benchmark_min_time=2 --benchmark_repetitions=3
 
 $(BENCHMARK_RUNNER): $(LIB_TARGET) $(BENCHMARK_OBJ_FILES) $(GBENCHMARK_OBJ)
 	@mkdir -p $(BIN_DIR)
