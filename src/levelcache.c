@@ -210,6 +210,11 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     }
     
     char *result = (char *)malloc(value_len + 1);
+    if (result == NULL) {
+        log_error("[get] Failed to allocate memory for result");
+        leveldb_free(value_buffer);
+        return NULL;
+    }
     memcpy(result, value_buffer, value_len);
     result[value_len] = '\0';
     leveldb_free(value_buffer);
