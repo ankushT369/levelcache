@@ -85,27 +85,41 @@ void levelcache_close(LevelCache *cache) {
 }
 
 int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
-    char *err = NULL;
-    
-    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
-
-    if (err != NULL) {
-        leveldb_free(err);
-        return -1;
-    }
-
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
 
     uint32_t __ttl_seconds = (ttl_seconds > 0) ? ttl_seconds : cache->default_ttl;
-
     uint64_t expiration = time(NULL) + __ttl_seconds;
+
+    int new_key = 0;
     if (meta == NULL) {
         meta = (KeyMetadata *) malloc(sizeof(KeyMetadata));
+        if (meta == NULL) return -1; // Allocation failed
         meta->key = strdup(key);
-        HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+        if (meta->key == NULL) { // Allocation failed
+            free(meta);
+            return -1;
+        }
+        new_key = 1;
     }
     meta->expiration = expiration;
+
+    char *err = NULL;
+    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
+
+    if (err != NULL) {
+        leveldb_free(err);
+        // Rollback in-memory change
+        if (new_key) {
+            free(meta->key);
+            free(meta);
+        }
+        return -1;
+    }
+
+    if (new_key) {
+        HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+    }
 
     return 0;
 }
@@ -145,23 +159,31 @@ char* levelcache_get(LevelCache *cache, const char *key) {
 }
 
 int levelcache_delete(LevelCache *cache, const char *key) {
-    char *err = NULL;
-    leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
-    if (err != NULL) {
-        leveldb_free(err);
-        // continue to delete from index
-    }
-
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
+
     if (meta != NULL) {
         HASH_DEL(cache->index, meta);
-        free(meta->key);
-        free(meta);
     }
 
+    char *err = NULL;
+    leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
+    
     if (err != NULL) {
+        leveldb_free(err);
+        // Rollback not strictly necessary for delete, but if we wanted to be
+        // perfectly consistent, we would re-add the metadata to the index.
+        // For now, we'll just report the error.
+        if (meta != NULL) {
+            // Re-add to index to rollback
+            HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+        }
         return -1;
+    }
+
+    if (meta != NULL) {
+        free(meta->key);
+        free(meta);
     }
 
     return 0;

@@ -17,7 +17,7 @@ protected:
         char command[256];
         snprintf(command, sizeof(command), "rm -rf %s", DB_PATH);
         system(command);
-        cache = levelcache_open(DB_PATH, 0, 0);
+        cache = levelcache_open(DB_PATH, 0, 1);
         ASSERT_NE(cache, nullptr);
     }
 
