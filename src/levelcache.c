@@ -3,12 +3,29 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "leveldb/c.h"
 #include "uthash.h"
 
 #define DEFAULT_TTL_SEC (24 * 60 * 60) // 1 day
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds) {
+void *cleanup_thread_function(void *arg) {
+    LevelCache *cache = (LevelCache *)arg;
+    while (!cache->stop_cleanup_thread) {
+        sleep(cache->cleanup_frequency_sec);
+        
+        KeyMetadata *current, *tmp;
+        HASH_ITER(hh, cache->index, current, tmp) {
+            if (current->expiration > 0 && time(NULL) > current->expiration) {
+                levelcache_delete(cache, current->key);
+            }
+        }
+    }
+    return NULL;
+}
+
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec) {
     LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
     if (cache == NULL) {
         return NULL;
@@ -16,6 +33,8 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     
     cache->index = NULL;
     cache->default_ttl = (default_ttl_seconds > 0) ? default_ttl_seconds : DEFAULT_TTL_SEC;
+    cache->cleanup_frequency_sec = cleanup_frequency_sec;
+    cache->stop_cleanup_thread = 0;
     
     char *err = NULL;
 
@@ -59,12 +78,25 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     cache->roptions = leveldb_readoptions_create();
     cache->woptions = leveldb_writeoptions_create();
 
+    if (cache->cleanup_frequency_sec > 0) {
+        if (pthread_create(&cache->cleanup_thread, NULL, cleanup_thread_function, cache)) {
+            // Failed to create thread
+            levelcache_close(cache);
+            return NULL;
+        }
+    }
+
     return cache;
 }
 
 void levelcache_close(LevelCache *cache) {
     if (cache == NULL) {
         return;
+    }
+
+    if (cache->cleanup_frequency_sec > 0) {
+        cache->stop_cleanup_thread = 1;
+        pthread_join(cache->cleanup_thread, NULL);
     }
 
     KeyMetadata *current, *tmp;

@@ -17,7 +17,7 @@ protected:
         char command[256];
         snprintf(command, sizeof(command), "rm -rf %s", DB_PATH);
         system(command);
-        cache = levelcache_open(DB_PATH, 0, 1);
+        cache = levelcache_open(DB_PATH, 0, 1, 0);
         ASSERT_NE(cache, nullptr);
     }
 
@@ -136,7 +136,7 @@ TEST_F(LevelCacheTest, EmptyValue) {
 
 TEST_F(LevelCacheTest, DefaultTtl) {
     levelcache_close(cache);
-    cache = levelcache_open(DB_PATH, 0, 2); // 2 seconds default TTL
+    cache = levelcache_open(DB_PATH, 0, 2, 0); // 2 seconds default TTL
     ASSERT_NE(cache, nullptr);
 
     const char *key = "default_ttl_key";
@@ -153,6 +153,38 @@ TEST_F(LevelCacheTest, DefaultTtl) {
     sleep(3);
 
     retrieved_value = levelcache_get(cache, key);
+    ASSERT_EQ(retrieved_value, nullptr);
+}
+
+TEST_F(LevelCacheTest, CleanupThread) {
+    levelcache_close(cache);
+    cache = levelcache_open(DB_PATH, 0, 1, 1); // 1 second cleanup frequency
+    ASSERT_NE(cache, nullptr);
+
+    const char *key1 = "key1";
+    const char *value1 = "value1";
+    ASSERT_EQ(levelcache_put(cache, key1, value1, 1), 0);
+
+    const char *key2 = "key2";
+    const char *value2 = "value2";
+    ASSERT_EQ(levelcache_put(cache, key2, value2, 3), 0);
+
+    // Wait for the cleanup thread to run
+    sleep(2);
+
+    // key1 should be gone
+    char *retrieved_value = levelcache_get(cache, key1);
+    ASSERT_EQ(retrieved_value, nullptr);
+
+    // key2 should still be there
+    retrieved_value = levelcache_get(cache, key2);
+    ASSERT_NE(retrieved_value, nullptr);
+    free(retrieved_value);
+
+    // Wait for key2 to expire
+    sleep(2);
+
+    retrieved_value = levelcache_get(cache, key2);
     ASSERT_EQ(retrieved_value, nullptr);
 }
 
