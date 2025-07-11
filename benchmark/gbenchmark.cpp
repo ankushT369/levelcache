@@ -36,7 +36,7 @@ public:
             char command[256];
             snprintf(command, sizeof(command), "rm -rf %s", DB_PATH_BENCH);
             system(command);
-            cache = levelcache_open(DB_PATH_BENCH, 100); // 100 MB cache
+            cache = levelcache_open(DB_PATH_BENCH, 100, 0, 0, LOG_FATAL); // 100 MB cache
             if (!cache) {
                 // This is a fatal error for the benchmark suite.
                 // We use a raw fprintf and exit because this setup is outside the benchmark run state.
