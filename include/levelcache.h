@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include "leveldb/c.h"
 #include "uthash.h"
+#include "log.h"
 
 /**
  * @brief Metadata for each key, stored in the in-memory index.
@@ -32,6 +33,7 @@ typedef struct LevelCache {
     pthread_t cleanup_thread;
     int stop_cleanup_thread;
     uint32_t cleanup_frequency_sec;
+    int log_level;
 } LevelCache;
 
 /**
@@ -41,9 +43,10 @@ typedef struct LevelCache {
  * @param max_memory_mb The maximum memory capacity in megabytes.
  * @param default_ttl_seconds The default time-to-live in seconds for keys. 0 means no TTL.
  * @param cleanup_frequency_sec The frequency in seconds for the cleanup thread to run. 0 disables the cleanup thread.
+ * @param log_level The initial log level. See log.h for levels.
  * @return A handle to the database, or NULL on error.
  */
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec);
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level);
 
 /**
  * @brief Closes a LevelCache database.

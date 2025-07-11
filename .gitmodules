@@ -7,3 +7,6 @@
 [submodule "vendor/uthash"]
 	path = vendor/uthash
 	url = https://github.com/troydhanson/uthash.git
+[submodule "vendor/log"]
+	path = vendor/log
+	url = https://github.com/rxi/log.c

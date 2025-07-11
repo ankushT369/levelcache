@@ -7,27 +7,36 @@
 #include <unistd.h>
 #include "leveldb/c.h"
 #include "uthash.h"
+#include "log.h"
 
 #define DEFAULT_TTL_SEC (24 * 60 * 60) // 1 day
 
 void *cleanup_thread_function(void *arg) {
     LevelCache *cache = (LevelCache *)arg;
+    log_info("[cleanup] Thread started with frequency %d seconds", cache->cleanup_frequency_sec);
     while (!cache->stop_cleanup_thread) {
         sleep(cache->cleanup_frequency_sec);
+        log_debug("[cleanup] Running cleanup cycle");
         
         KeyMetadata *current, *tmp;
         HASH_ITER(hh, cache->index, current, tmp) {
             if (current->expiration > 0 && time(NULL) > current->expiration) {
+                log_info("[cleanup] Key '%s' expired, deleting", current->key);
                 levelcache_delete(cache, current->key);
             }
         }
     }
+    log_info("[cleanup] Thread stopped");
     return NULL;
 }
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec) {
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level) {
+    log_set_level(log_level);
+    log_info("[open] Opening database at '%s'", path);
+
     LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
     if (cache == NULL) {
+        log_error("[open] Failed to allocate memory for cache");
         return NULL;
     }
     
@@ -35,16 +44,15 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     cache->default_ttl = (default_ttl_seconds > 0) ? default_ttl_seconds : DEFAULT_TTL_SEC;
     cache->cleanup_frequency_sec = cleanup_frequency_sec;
     cache->stop_cleanup_thread = 0;
+    cache->log_level = log_level;
     
     char *err = NULL;
 
-    // Destroy the existing database if it exists
     leveldb_options_t* destroy_options = leveldb_options_create();
     leveldb_destroy_db(destroy_options, path, &err);
     leveldb_options_destroy(destroy_options);
     if (err != NULL) {
-        // This is not a fatal error, maybe the db didn't exist.
-        // We can log this if we have a logging mechanism.
+        log_warn("[open] Could not destroy existing database: %s", err);
         leveldb_free(err);
         err = NULL; 
     }
@@ -57,7 +65,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
         size_t cache_size = cache->max_memory_mb * 1024 * 1024;
         cache->lru_cache = leveldb_cache_create_lru(cache_size);
         leveldb_options_set_cache(cache->options, cache->lru_cache);
-        cache->used_memory_bytes = cache_size;
+        log_info("[open] LRU cache created with size %zu MB", max_memory_mb);
     } else {
         cache->lru_cache = NULL;
         cache->used_memory_bytes = 0;
@@ -66,6 +74,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     cache->db = leveldb_open(cache->options, path, &err);
 
     if (err != NULL) {
+        log_error("[open] Failed to open database: %s", err);
         leveldb_free(err);
         leveldb_options_destroy(cache->options);
         if(cache->lru_cache) {
@@ -80,12 +89,13 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
 
     if (cache->cleanup_frequency_sec > 0) {
         if (pthread_create(&cache->cleanup_thread, NULL, cleanup_thread_function, cache)) {
-            // Failed to create thread
+            log_error("[open] Failed to create cleanup thread");
             levelcache_close(cache);
             return NULL;
         }
     }
 
+    log_info("[open] Database opened successfully");
     return cache;
 }
 
@@ -93,6 +103,7 @@ void levelcache_close(LevelCache *cache) {
     if (cache == NULL) {
         return;
     }
+    log_info("[close] Closing database");
 
     if (cache->cleanup_frequency_sec > 0) {
         cache->stop_cleanup_thread = 1;
@@ -114,9 +125,11 @@ void levelcache_close(LevelCache *cache) {
         leveldb_cache_destroy(cache->lru_cache);
     }
     free(cache);
+    log_info("[close] Database closed");
 }
 
 int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
+    log_trace("[put] Putting key '%s'", key);
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
 
@@ -125,14 +138,21 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
 
     int new_key = 0;
     if (meta == NULL) {
+        log_debug("[put] Key '%s' not found, creating new entry", key);
         meta = (KeyMetadata *) malloc(sizeof(KeyMetadata));
-        if (meta == NULL) return -1; // Allocation failed
+        if (meta == NULL) {
+            log_error("[put] Failed to allocate memory for key metadata");
+            return -1;
+        }
         meta->key = strdup(key);
-        if (meta->key == NULL) { // Allocation failed
+        if (meta->key == NULL) {
+            log_error("[put] Failed to duplicate key string");
             free(meta);
             return -1;
         }
         new_key = 1;
+    } else {
+        log_debug("[put] Key '%s' found, updating expiration", key);
     }
     meta->expiration = expiration;
 
@@ -140,9 +160,10 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
     leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
 
     if (err != NULL) {
+        log_error("[put] Failed to put key '%s' into leveldb: %s", key, err);
         leveldb_free(err);
-        // Rollback in-memory change
         if (new_key) {
+            log_debug("[put] Rolling back in-memory insert for key '%s'", key);
             free(meta->key);
             free(meta);
         }
@@ -152,21 +173,24 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
     if (new_key) {
         HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
     }
+    log_info("[put] Key '%s' put successfully with TTL %u seconds", key, __ttl_seconds);
 
     return 0;
 }
 
 char* levelcache_get(LevelCache *cache, const char *key) {
+    log_trace("[get] Getting key '%s'", key);
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
 
     if (meta != NULL) {
         if (meta->expiration > 0 && time(NULL) > meta->expiration) {
+            log_info("[get] Key '%s' expired, deleting", key);
             levelcache_delete(cache, key);
             return NULL;
         }
     } else {
-        // Key not in index, so it's considered not found.
+        log_debug("[get] Key '%s' not found in index", key);
         return NULL;
     }
 
@@ -175,11 +199,13 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     char *value_buffer = leveldb_get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
 
     if (err != NULL) {
+        log_error("[get] Failed to get key '%s' from leveldb: %s", key, err);
         leveldb_free(err);
         return NULL;
     }
 
     if (value_buffer == NULL) {
+        log_warn("[get] Key '%s' not found in db, but present in index. Inconsistency.", key);
         return NULL;
     }
     
@@ -187,10 +213,12 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     memcpy(result, value_buffer, value_len);
     result[value_len] = '\0';
     leveldb_free(value_buffer);
+    log_info("[get] Key '%s' retrieved successfully", key);
     return result;
 }
 
 int levelcache_delete(LevelCache *cache, const char *key) {
+    log_trace("[delete] Deleting key '%s'", key);
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
 
@@ -202,12 +230,10 @@ int levelcache_delete(LevelCache *cache, const char *key) {
     leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
     
     if (err != NULL) {
+        log_error("[delete] Failed to delete key '%s' from leveldb: %s", key, err);
         leveldb_free(err);
-        // Rollback not strictly necessary for delete, but if we wanted to be
-        // perfectly consistent, we would re-add the metadata to the index.
-        // For now, we'll just report the error.
         if (meta != NULL) {
-            // Re-add to index to rollback
+            log_debug("[delete] Rolling back in-memory delete for key '%s'", key);
             HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
         }
         return -1;
@@ -217,6 +243,7 @@ int levelcache_delete(LevelCache *cache, const char *key) {
         free(meta->key);
         free(meta);
     }
+    log_info("[delete] Key '%s' deleted successfully", key);
 
     return 0;
 }
