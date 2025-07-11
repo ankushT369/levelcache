@@ -34,6 +34,7 @@ typedef struct LevelCache {
     int stop_cleanup_thread;
     uint32_t cleanup_frequency_sec;
     int log_level;
+    size_t total_memory_bytes;
 } LevelCache;
 
 /**
@@ -85,5 +86,13 @@ char* levelcache_get(LevelCache *cache, const char *key);
  * @return 0 on success, -1 on error.
  */
 int levelcache_delete(LevelCache *cache, const char *key);
+
+/**
+ * @brief Gets the current memory usage of the cache in bytes.
+ *
+ * @param cache The database handle.
+ * @return The memory usage in bytes.
+ */
+size_t levelcache_get_memory_usage(LevelCache *cache);
 
 #endif // LEVELCACHE_H

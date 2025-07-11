@@ -45,6 +45,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     cache->cleanup_frequency_sec = cleanup_frequency_sec;
     cache->stop_cleanup_thread = 0;
     cache->log_level = log_level;
+    cache->total_memory_bytes = sizeof(LevelCache);
     
     char *err = NULL;
 
@@ -65,6 +66,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
         size_t cache_size = cache->max_memory_mb * 1024 * 1024;
         cache->lru_cache = leveldb_cache_create_lru(cache_size);
         leveldb_options_set_cache(cache->options, cache->lru_cache);
+        cache->total_memory_bytes += cache_size;
         log_info("[open] LRU cache created with size %zu MB", max_memory_mb);
     } else {
         cache->lru_cache = NULL;
@@ -96,6 +98,7 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     }
 
     log_info("[open] Database opened successfully");
+    log_warn("[open] Memory usage tracking does not include all internal leveldb allocations.");
     return cache;
 }
 
@@ -113,6 +116,7 @@ void levelcache_close(LevelCache *cache) {
     KeyMetadata *current, *tmp;
     HASH_ITER(hh, cache->index, current, tmp) {
         HASH_DEL(cache->index, current);
+        cache->total_memory_bytes -= (sizeof(KeyMetadata) + strlen(current->key) + 1);
         free(current->key);
         free(current);
     }
@@ -151,6 +155,7 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
             return -1;
         }
         new_key = 1;
+        cache->total_memory_bytes += (sizeof(KeyMetadata) + strlen(key) + 1);
     } else {
         log_debug("[put] Key '%s' found, updating expiration", key);
     }
@@ -164,6 +169,7 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
         leveldb_free(err);
         if (new_key) {
             log_debug("[put] Rolling back in-memory insert for key '%s'", key);
+            cache->total_memory_bytes -= (sizeof(KeyMetadata) + strlen(key) + 1);
             free(meta->key);
             free(meta);
         }
@@ -229,6 +235,7 @@ int levelcache_delete(LevelCache *cache, const char *key) {
 
     if (meta != NULL) {
         HASH_DEL(cache->index, meta);
+        cache->total_memory_bytes -= (sizeof(KeyMetadata) + strlen(key) + 1);
     }
 
     char *err = NULL;
@@ -240,6 +247,7 @@ int levelcache_delete(LevelCache *cache, const char *key) {
         if (meta != NULL) {
             log_debug("[delete] Rolling back in-memory delete for key '%s'", key);
             HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+            cache->total_memory_bytes += (sizeof(KeyMetadata) + strlen(key) + 1);
         }
         return -1;
     }
@@ -251,4 +259,11 @@ int levelcache_delete(LevelCache *cache, const char *key) {
     log_info("[delete] Key '%s' deleted successfully", key);
 
     return 0;
+}
+
+size_t levelcache_get_memory_usage(LevelCache *cache) {
+    if (cache == NULL) {
+        return 0;
+    }
+    return cache->total_memory_bytes;
 }

@@ -196,4 +196,28 @@ TEST_F(LevelCacheTest, LogLevel) {
     ASSERT_EQ(cache->log_level, LOG_INFO);
 }
 
+TEST_F(LevelCacheTest, MemoryUsage) {
+    size_t initial_memory = levelcache_get_memory_usage(cache);
+    
+    const char *key1 = "mem_key_1";
+    const char *value1 = "value1";
+    levelcache_put(cache, key1, value1, 0);
+    size_t memory_after_put1 = levelcache_get_memory_usage(cache);
+    ASSERT_GT(memory_after_put1, initial_memory);
+
+    const char *key2 = "mem_key_2";
+    const char *value2 = "value2";
+    levelcache_put(cache, key2, value2, 0);
+    size_t memory_after_put2 = levelcache_get_memory_usage(cache);
+    ASSERT_GT(memory_after_put2, memory_after_put1);
+
+    levelcache_delete(cache, key1);
+    size_t memory_after_delete1 = levelcache_get_memory_usage(cache);
+    ASSERT_LT(memory_after_delete1, memory_after_put2);
+    
+    levelcache_delete(cache, key2);
+    size_t memory_after_delete2 = levelcache_get_memory_usage(cache);
+    ASSERT_EQ(memory_after_delete2, initial_memory);
+}
+
 } // namespace
