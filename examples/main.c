@@ -6,7 +6,7 @@ int main() {
     const char* db_path = "/tmp/my_project_db";
 
     // Open the database with a 10MB cache
-    LevelCache* cache = levelcache_open(db_path, 10);
+    LevelCache* cache = levelcache_open(db_path, 10, 0);
     if (cache == NULL) {
         fprintf(stderr, "Failed to open database.\n");
         return 1;

@@ -4,12 +4,18 @@
 #include <stdint.h>
 #include <time.h>
 #include "leveldb/c.h"
+#include "uthash.h"
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
+#define DEFAULT_TTL_SEC (24 * 60 * 60) // 1 day
+
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds) {
     LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
     if (cache == NULL) {
         return NULL;
     }
+    
+    cache->index = NULL;
+    cache->default_ttl = (default_ttl_seconds > 0) ? default_ttl_seconds : DEFAULT_TTL_SEC;
     
     char *err = NULL;
 
@@ -61,6 +67,13 @@ void levelcache_close(LevelCache *cache) {
         return;
     }
 
+    KeyMetadata *current, *tmp;
+    HASH_ITER(hh, cache->index, current, tmp) {
+        HASH_DEL(cache->index, current);
+        free(current->key);
+        free(current);
+    }
+
     leveldb_close(cache->db);
     leveldb_options_destroy(cache->options);
     leveldb_readoptions_destroy(cache->roptions);
@@ -74,26 +87,42 @@ void levelcache_close(LevelCache *cache) {
 int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
     char *err = NULL;
     
-    size_t value_len = strlen(value);
-    uint64_t expiration = (ttl_seconds > 0) ? time(NULL) + ttl_seconds : 0;
-    
-    size_t new_value_len = value_len + sizeof(expiration);
-    char *new_value = malloc(new_value_len);
-    memcpy(new_value, value, value_len);
-    memcpy(new_value + value_len, &expiration, sizeof(expiration));
-    
-    leveldb_put(cache->db, cache->woptions, key, strlen(key), new_value, new_value_len, &err);
-    free(new_value);
+    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
 
     if (err != NULL) {
         leveldb_free(err);
         return -1;
     }
 
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+
+    uint32_t __ttl_seconds = (ttl_seconds > 0) ? ttl_seconds : cache->default_ttl;
+
+    uint64_t expiration = time(NULL) + __ttl_seconds;
+    if (meta == NULL) {
+        meta = (KeyMetadata *) malloc(sizeof(KeyMetadata));
+        meta->key = strdup(key);
+        HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+    }
+    meta->expiration = expiration;
+
     return 0;
 }
 
 char* levelcache_get(LevelCache *cache, const char *key) {
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+
+    if (meta == NULL) {
+        return NULL;
+    }
+
+    if (meta->expiration > 0 && time(NULL) > meta->expiration) {
+        levelcache_delete(cache, key);
+        return NULL;
+    }
+
     char *err = NULL;
     size_t value_len;
     char *value_buffer = leveldb_get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
@@ -106,20 +135,9 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     if (value_buffer == NULL) {
         return NULL;
     }
-
-    uint64_t expiration;
-    memcpy(&expiration, value_buffer + value_len - sizeof(expiration), sizeof(expiration));
-
-    if (expiration > 0 && time(NULL) > expiration) {
-        leveldb_free(value_buffer);
-        levelcache_delete(cache, key);
-        return NULL;
-    }
-
-    size_t real_value_len = value_len - sizeof(expiration);
-    char *result = (char *)malloc(real_value_len + 1);
-    memcpy(result, value_buffer, real_value_len);
-    result[real_value_len] = '\0';
+    
+    char *result = (char *)malloc(value_len);
+    memcpy(result, value_buffer, value_len);
     leveldb_free(value_buffer);
     return result;
 }
@@ -129,6 +147,18 @@ int levelcache_delete(LevelCache *cache, const char *key) {
     leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
     if (err != NULL) {
         leveldb_free(err);
+        // continue to delete from index
+    }
+
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+    if (meta != NULL) {
+        HASH_DEL(cache->index, meta);
+        free(meta->key);
+        free(meta);
+    }
+
+    if (err != NULL) {
         return -1;
     }
 
