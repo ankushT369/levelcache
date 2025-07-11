@@ -114,12 +114,13 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     KeyMetadata *meta;
     HASH_FIND_STR(cache->index, key, meta);
 
-    if (meta == NULL) {
-        return NULL;
-    }
-
-    if (meta->expiration > 0 && time(NULL) > meta->expiration) {
-        levelcache_delete(cache, key);
+    if (meta != NULL) {
+        if (meta->expiration > 0 && time(NULL) > meta->expiration) {
+            levelcache_delete(cache, key);
+            return NULL;
+        }
+    } else {
+        // Key not in index, so it's considered not found.
         return NULL;
     }
 
@@ -136,8 +137,9 @@ char* levelcache_get(LevelCache *cache, const char *key) {
         return NULL;
     }
     
-    char *result = (char *)malloc(value_len);
+    char *result = (char *)malloc(value_len + 1);
     memcpy(result, value_buffer, value_len);
+    result[value_len] = '\0';
     leveldb_free(value_buffer);
     return result;
 }
