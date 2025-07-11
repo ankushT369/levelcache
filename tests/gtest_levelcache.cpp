@@ -3,6 +3,7 @@
 
 extern "C" {
 #include "levelcache.h"
+#include "log.h"
 }
 
 namespace {
@@ -17,7 +18,7 @@ protected:
         char command[256];
         snprintf(command, sizeof(command), "rm -rf %s", DB_PATH);
         system(command);
-        cache = levelcache_open(DB_PATH, 0, 1, 0);
+        cache = levelcache_open(DB_PATH, 0, 1, 0, LOG_FATAL);
         ASSERT_NE(cache, nullptr);
     }
 
@@ -136,7 +137,7 @@ TEST_F(LevelCacheTest, EmptyValue) {
 
 TEST_F(LevelCacheTest, DefaultTtl) {
     levelcache_close(cache);
-    cache = levelcache_open(DB_PATH, 0, 2, 0); // 2 seconds default TTL
+    cache = levelcache_open(DB_PATH, 0, 2, 0, LOG_FATAL); // 2 seconds default TTL
     ASSERT_NE(cache, nullptr);
 
     const char *key = "default_ttl_key";
@@ -158,7 +159,7 @@ TEST_F(LevelCacheTest, DefaultTtl) {
 
 TEST_F(LevelCacheTest, CleanupThread) {
     levelcache_close(cache);
-    cache = levelcache_open(DB_PATH, 0, 1, 1); // 1 second cleanup frequency
+    cache = levelcache_open(DB_PATH, 0, 1, 1, LOG_FATAL); // 1 second cleanup frequency
     ASSERT_NE(cache, nullptr);
 
     const char *key1 = "key1";
@@ -170,7 +171,7 @@ TEST_F(LevelCacheTest, CleanupThread) {
     ASSERT_EQ(levelcache_put(cache, key2, value2, 3), 0);
 
     // Wait for the cleanup thread to run
-    sleep(2);
+    sleep(3);
 
     // key1 should be gone
     char *retrieved_value = levelcache_get(cache, key1);
@@ -186,6 +187,13 @@ TEST_F(LevelCacheTest, CleanupThread) {
 
     retrieved_value = levelcache_get(cache, key2);
     ASSERT_EQ(retrieved_value, nullptr);
+}
+
+TEST_F(LevelCacheTest, LogLevel) {
+    levelcache_close(cache);
+    cache = levelcache_open(DB_PATH, 0, 1, 0, LOG_INFO);
+    ASSERT_NE(cache, nullptr);
+    ASSERT_EQ(cache->log_level, LOG_INFO);
 }
 
 } // namespace

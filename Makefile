@@ -1,6 +1,6 @@
 CC = gcc
 CXX = g++
-CFLAGS = -Iinclude -Ivendor/leveldb/include -Ivendor/googletest/googletest/include -Ivendor/googletest/googletest -Ivendor/uthash/src -Wall -g
+CFLAGS = -Iinclude -Ivendor/leveldb/include -Ivendor/googletest/googletest/include -Ivendor/googletest/googletest -Ivendor/uthash/src -Ivendor/log/src -Wall -g
 CXXFLAGS = $(CFLAGS) -std=c++17 -isystem vendor/leveldb/third_party/benchmark/include
 LDFLAGS = -lstdc++ -pthread
 
@@ -14,8 +14,9 @@ LIB_TARGET = $(LIB_DIR)/$(LIB_NAME)
 
 LEVELDB_LIB = vendor/leveldb/libleveldb.a
 
-SRC_FILES = src/levelcache.c
-OBJ_FILES = $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(SRC_FILES))
+SRC_FILES = src/levelcache.c vendor/log/src/log.c
+OBJ_FILES = $(patsubst src/%.c,$(OBJ_DIR)/src/%.o,$(filter src/%.c,$(SRC_FILES)))
+OBJ_FILES += $(patsubst vendor/log/src/%.c,$(OBJ_DIR)/vendor/log/src/%.o,$(filter vendor/log/src/%.c,$(SRC_FILES)))
 
 GTEST_SRC_FILES = vendor/googletest/googletest/src/gtest-all.cc vendor/googletest/googletest/src/gtest_main.cc
 GTEST_OBJ_FILES = $(patsubst vendor/googletest/googletest/src/%.cc,$(OBJ_DIR)/vendor/googletest/googletest/src/%.o,$(GTEST_SRC_FILES))
@@ -54,6 +55,10 @@ $(OBJ_DIR)/tests/%.o: tests/%.cpp
 $(OBJ_DIR)/benchmark/%.o: benchmark/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/vendor/log/src/%.o: vendor/log/src/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/vendor/googletest/googletest/src/%.o: vendor/googletest/googletest/src/%.cc
 	@mkdir -p $(@D)
