@@ -3,7 +3,18 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <pthread.h>
 #include "leveldb/c.h"
+#include "uthash.h"
+
+/**
+ * @brief Metadata for each key, stored in the in-memory index.
+ */
+typedef struct KeyMetadata {
+    char *key;
+    uint64_t expiration;
+    UT_hash_handle hh;
+} KeyMetadata;
 
 /**
  * @brief An opaque handle to the LevelCache database.
@@ -16,6 +27,11 @@ typedef struct LevelCache {
     leveldb_cache_t *lru_cache;
     size_t max_memory_mb;
     size_t used_memory_bytes;
+    uint32_t default_ttl;
+    KeyMetadata *index;
+    pthread_t cleanup_thread;
+    int stop_cleanup_thread;
+    uint32_t cleanup_frequency_sec;
 } LevelCache;
 
 /**
@@ -23,9 +39,11 @@ typedef struct LevelCache {
  *
  * @param path The filesystem path to the database.
  * @param max_memory_mb The maximum memory capacity in megabytes.
+ * @param default_ttl_seconds The default time-to-live in seconds for keys. 0 means no TTL.
+ * @param cleanup_frequency_sec The frequency in seconds for the cleanup thread to run. 0 disables the cleanup thread.
  * @return A handle to the database, or NULL on error.
  */
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb);
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec);
 
 /**
  * @brief Closes a LevelCache database.
@@ -40,7 +58,7 @@ void levelcache_close(LevelCache *cache);
  * @param cache The database handle.
  * @param key The key to store.
  * @param value The null-terminated string value to store.
- * @param ttl_seconds The time-to-live in seconds. 0 means no TTL.
+ * @param ttl_seconds The time-to-live in seconds. If 0, the default TTL is used.
  * @return 0 on success, -1 on error.
  */
 int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds);

@@ -3,13 +3,38 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "leveldb/c.h"
+#include "uthash.h"
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
+#define DEFAULT_TTL_SEC (24 * 60 * 60) // 1 day
+
+void *cleanup_thread_function(void *arg) {
+    LevelCache *cache = (LevelCache *)arg;
+    while (!cache->stop_cleanup_thread) {
+        sleep(cache->cleanup_frequency_sec);
+        
+        KeyMetadata *current, *tmp;
+        HASH_ITER(hh, cache->index, current, tmp) {
+            if (current->expiration > 0 && time(NULL) > current->expiration) {
+                levelcache_delete(cache, current->key);
+            }
+        }
+    }
+    return NULL;
+}
+
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec) {
     LevelCache *cache = (LevelCache *) malloc(sizeof(LevelCache));
     if (cache == NULL) {
         return NULL;
     }
+    
+    cache->index = NULL;
+    cache->default_ttl = (default_ttl_seconds > 0) ? default_ttl_seconds : DEFAULT_TTL_SEC;
+    cache->cleanup_frequency_sec = cleanup_frequency_sec;
+    cache->stop_cleanup_thread = 0;
     
     char *err = NULL;
 
@@ -53,12 +78,32 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb) {
     cache->roptions = leveldb_readoptions_create();
     cache->woptions = leveldb_writeoptions_create();
 
+    if (cache->cleanup_frequency_sec > 0) {
+        if (pthread_create(&cache->cleanup_thread, NULL, cleanup_thread_function, cache)) {
+            // Failed to create thread
+            levelcache_close(cache);
+            return NULL;
+        }
+    }
+
     return cache;
 }
 
 void levelcache_close(LevelCache *cache) {
     if (cache == NULL) {
         return;
+    }
+
+    if (cache->cleanup_frequency_sec > 0) {
+        cache->stop_cleanup_thread = 1;
+        pthread_join(cache->cleanup_thread, NULL);
+    }
+
+    KeyMetadata *current, *tmp;
+    HASH_ITER(hh, cache->index, current, tmp) {
+        HASH_DEL(cache->index, current);
+        free(current->key);
+        free(current);
     }
 
     leveldb_close(cache->db);
@@ -72,28 +117,59 @@ void levelcache_close(LevelCache *cache) {
 }
 
 int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32_t ttl_seconds) {
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+
+    uint32_t __ttl_seconds = (ttl_seconds > 0) ? ttl_seconds : cache->default_ttl;
+    uint64_t expiration = time(NULL) + __ttl_seconds;
+
+    int new_key = 0;
+    if (meta == NULL) {
+        meta = (KeyMetadata *) malloc(sizeof(KeyMetadata));
+        if (meta == NULL) return -1; // Allocation failed
+        meta->key = strdup(key);
+        if (meta->key == NULL) { // Allocation failed
+            free(meta);
+            return -1;
+        }
+        new_key = 1;
+    }
+    meta->expiration = expiration;
+
     char *err = NULL;
-    
-    size_t value_len = strlen(value);
-    uint64_t expiration = (ttl_seconds > 0) ? time(NULL) + ttl_seconds : 0;
-    
-    size_t new_value_len = value_len + sizeof(expiration);
-    char *new_value = malloc(new_value_len);
-    memcpy(new_value, value, value_len);
-    memcpy(new_value + value_len, &expiration, sizeof(expiration));
-    
-    leveldb_put(cache->db, cache->woptions, key, strlen(key), new_value, new_value_len, &err);
-    free(new_value);
+    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
 
     if (err != NULL) {
         leveldb_free(err);
+        // Rollback in-memory change
+        if (new_key) {
+            free(meta->key);
+            free(meta);
+        }
         return -1;
+    }
+
+    if (new_key) {
+        HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
     }
 
     return 0;
 }
 
 char* levelcache_get(LevelCache *cache, const char *key) {
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+
+    if (meta != NULL) {
+        if (meta->expiration > 0 && time(NULL) > meta->expiration) {
+            levelcache_delete(cache, key);
+            return NULL;
+        }
+    } else {
+        // Key not in index, so it's considered not found.
+        return NULL;
+    }
+
     char *err = NULL;
     size_t value_len;
     char *value_buffer = leveldb_get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
@@ -106,30 +182,40 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     if (value_buffer == NULL) {
         return NULL;
     }
-
-    uint64_t expiration;
-    memcpy(&expiration, value_buffer + value_len - sizeof(expiration), sizeof(expiration));
-
-    if (expiration > 0 && time(NULL) > expiration) {
-        leveldb_free(value_buffer);
-        levelcache_delete(cache, key);
-        return NULL;
-    }
-
-    size_t real_value_len = value_len - sizeof(expiration);
-    char *result = (char *)malloc(real_value_len + 1);
-    memcpy(result, value_buffer, real_value_len);
-    result[real_value_len] = '\0';
+    
+    char *result = (char *)malloc(value_len + 1);
+    memcpy(result, value_buffer, value_len);
+    result[value_len] = '\0';
     leveldb_free(value_buffer);
     return result;
 }
 
 int levelcache_delete(LevelCache *cache, const char *key) {
+    KeyMetadata *meta;
+    HASH_FIND_STR(cache->index, key, meta);
+
+    if (meta != NULL) {
+        HASH_DEL(cache->index, meta);
+    }
+
     char *err = NULL;
     leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
+    
     if (err != NULL) {
         leveldb_free(err);
+        // Rollback not strictly necessary for delete, but if we wanted to be
+        // perfectly consistent, we would re-add the metadata to the index.
+        // For now, we'll just report the error.
+        if (meta != NULL) {
+            // Re-add to index to rollback
+            HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);
+        }
         return -1;
+    }
+
+    if (meta != NULL) {
+        free(meta->key);
+        free(meta);
     }
 
     return 0;
