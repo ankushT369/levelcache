@@ -5,7 +5,6 @@
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
-#include "leveldb/c.h"
 #include "uthash.h"
 #include "log.h"
 
@@ -30,7 +29,7 @@ void *cleanup_thread_function(void *arg) {
     return NULL;
 }
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level) {
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level, engine_t engine_type) {
     log_set_level(log_level);
     log_info("[open] Opening database at '%s'", path);
 
@@ -39,7 +38,10 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
         log_error("[open] Failed to allocate memory for cache");
         return NULL;
     }
+
+    StorageEngine *engine = ALL_ENGINES[engine_type];
     
+    cache->engine = engine;
     cache->index = NULL;
     cache->default_ttl = (default_ttl_seconds > 0) ? default_ttl_seconds : DEFAULT_TTL_SEC;
     cache->cleanup_frequency_sec = cleanup_frequency_sec;
@@ -49,23 +51,23 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
     
     char *err = NULL;
 
-    leveldb_options_t* destroy_options = leveldb_options_create();
-    leveldb_destroy_db(destroy_options, path, &err);
-    leveldb_options_destroy(destroy_options);
+    void* destroy_options = cache->engine->options_create();
+    cache->engine->destroy_db(destroy_options, path, &err);
+    cache->engine->options_destroy(destroy_options);
     if (err != NULL) {
         log_warn("[open] Could not destroy existing database: %s", err);
-        leveldb_free(err);
+        cache->engine->free_fn(err);
         err = NULL; 
     }
 
-    cache->options = leveldb_options_create();
-    leveldb_options_set_create_if_missing(cache->options, 1);
+    cache->options = cache->engine->options_create();
+    cache->engine->options_set_create_if_missing(cache->options, 1);
 
     cache->max_memory_mb = max_memory_mb;
     if (cache->max_memory_mb > 0) {
         size_t cache_size = cache->max_memory_mb * 1024 * 1024;
-        cache->lru_cache = leveldb_cache_create_lru(cache_size);
-        leveldb_options_set_cache(cache->options, cache->lru_cache);
+        cache->lru_cache = cache->engine->cache_create_lru(cache_size);
+        cache->engine->options_set_cache(cache->options, cache->lru_cache);
         cache->total_memory_bytes += cache_size;
         log_info("[open] LRU cache created with size %zu MB", max_memory_mb);
     } else {
@@ -73,26 +75,26 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
         cache->used_memory_bytes = 0;
     }
 
-    cache->db = leveldb_open(cache->options, path, &err);
+    cache->db = cache->engine->open(cache->options, path, &err);
 
     if (err != NULL) {
         log_error("[open] Failed to open database: %s", err);
-        leveldb_free(err);
-        leveldb_options_destroy(cache->options);
+        cache->engine->free_fn(err);
+        cache->engine->options_destroy(cache->options);
         if(cache->lru_cache) {
-            leveldb_cache_destroy(cache->lru_cache);
+            cache->engine->cache_destroy(cache->lru_cache);
         }
         free(cache);
         return NULL;
     }
 
-    cache->roptions = leveldb_readoptions_create();
-    cache->woptions = leveldb_writeoptions_create();
+    cache->roptions = cache->engine->readoptions_create();
+    cache->woptions = cache->engine->writeoptions_create();
 
     if (cache->cleanup_frequency_sec > 0) {
         if (pthread_create(&cache->cleanup_thread, NULL, cleanup_thread_function, cache)) {
             log_error("[open] Failed to create cleanup thread");
-            levelcache_close(cache);
+            cache->engine->close(cache);
             return NULL;
         }
     }
@@ -121,12 +123,12 @@ void levelcache_close(LevelCache *cache) {
         free(current);
     }
 
-    leveldb_close(cache->db);
-    leveldb_options_destroy(cache->options);
-    leveldb_readoptions_destroy(cache->roptions);
-    leveldb_writeoptions_destroy(cache->woptions);
+    cache->engine->close(cache->db);
+    cache->engine->options_destroy(cache->options);
+    cache->engine->readoptions_destroy(cache->roptions);
+    cache->engine->writeoptions_destroy(cache->woptions);
     if (cache->lru_cache) {
-        leveldb_cache_destroy(cache->lru_cache);
+        cache->engine->cache_destroy(cache->lru_cache);
     }
     free(cache);
     log_info("[close] Database closed");
@@ -162,11 +164,11 @@ int levelcache_put(LevelCache *cache, const char *key, const char *value, uint32
     meta->expiration = expiration;
 
     char *err = NULL;
-    leveldb_put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
+    cache->engine->put(cache->db, cache->woptions, key, strlen(key), value, strlen(value), &err);
 
     if (err != NULL) {
         log_error("[put] Failed to put key '%s' into leveldb: %s", key, err);
-        leveldb_free(err);
+        cache->engine->free_fn(err);
         if (new_key) {
             log_debug("[put] Rolling back in-memory insert for key '%s'", key);
             cache->total_memory_bytes -= (sizeof(KeyMetadata) + strlen(key) + 1);
@@ -202,11 +204,11 @@ char* levelcache_get(LevelCache *cache, const char *key) {
 
     char *err = NULL;
     size_t value_len;
-    char *value_buffer = leveldb_get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
+    char *value_buffer = cache->engine->get(cache->db, cache->roptions, key, strlen(key), &value_len, &err);
 
     if (err != NULL) {
         log_error("[get] Failed to get key '%s' from leveldb: %s", key, err);
-        leveldb_free(err);
+        cache->engine->free_fn(err);
         return NULL;
     }
 
@@ -218,12 +220,12 @@ char* levelcache_get(LevelCache *cache, const char *key) {
     char *result = (char *)malloc(value_len + 1);
     if (result == NULL) {
         log_error("[get] Failed to allocate memory for result");
-        leveldb_free(value_buffer);
+        cache->engine->free_fn(value_buffer);
         return NULL;
     }
     memcpy(result, value_buffer, value_len);
     result[value_len] = '\0';
-    leveldb_free(value_buffer);
+    cache->engine->free_fn(value_buffer);
     log_info("[get] Key '%s' retrieved successfully", key);
     return result;
 }
@@ -239,11 +241,11 @@ int levelcache_delete(LevelCache *cache, const char *key) {
     }
 
     char *err = NULL;
-    leveldb_delete(cache->db, cache->woptions, key, strlen(key), &err);
+    cache->engine->del(cache->db, cache->woptions, key, strlen(key), &err);
     
     if (err != NULL) {
         log_error("[delete] Failed to delete key '%s' from leveldb: %s", key, err);
-        leveldb_free(err);
+        cache->engine->free_fn(err);
         if (meta != NULL) {
             log_debug("[delete] Rolling back in-memory delete for key '%s'", key);
             HASH_ADD_KEYPTR(hh, cache->index, meta->key, strlen(meta->key), meta);

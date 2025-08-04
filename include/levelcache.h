@@ -5,8 +5,15 @@
 #include <stdint.h>
 #include <pthread.h>
 #include "leveldb/c.h"
+#include "../vendor/rocksdb/include/rocksdb/c.h"
 #include "uthash.h"
 #include "log.h"
+#include "storage_engine.h"
+
+static StorageEngine* ALL_ENGINES[LIMIT] = {
+    &LEVELDB_ENGINE,
+    &ROCKSDB_ENGINE
+};
 
 /**
  * @brief Metadata for each key, stored in the in-memory index.
@@ -21,11 +28,11 @@ typedef struct KeyMetadata {
  * @brief An opaque handle to the LevelCache database.
  */
 typedef struct LevelCache {
-    leveldb_t *db;
-    leveldb_options_t *options;
-    leveldb_readoptions_t *roptions;
-    leveldb_writeoptions_t *woptions;
-    leveldb_cache_t *lru_cache;
+    void *db;
+    void *options;
+    void *roptions;
+    void *woptions;
+    void *lru_cache;
     size_t max_memory_mb;
     size_t used_memory_bytes;
     uint32_t default_ttl;
@@ -35,7 +42,9 @@ typedef struct LevelCache {
     uint32_t cleanup_frequency_sec;
     int log_level;
     size_t total_memory_bytes;
+    StorageEngine* engine;
 } LevelCache;
+
 
 /**
  * @brief Opens a LevelCache database at the specified path.
@@ -47,7 +56,7 @@ typedef struct LevelCache {
  * @param log_level The initial log level. See log.h for levels.
  * @return A handle to the database, or NULL on error.
  */
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level);
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level, engine_t engine);
 
 /**
  * @brief Closes a LevelCache database.
