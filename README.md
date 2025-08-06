@@ -1,8 +1,8 @@
-# LevelCache
+# flashcache
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-LevelCache is a high-performance, ephemeral, embedded key-value caching library written in C. It is built on top of Google's [LevelDB](https://github.com/google/leveldb) and provides a simple, clean API for caching with Time-to-Live (TTL) support.
+flashcache is a high-performance, ephemeral, embedded key-value caching library written in C. It is built on top of Google's [LevelDB](https://github.com/google/leveldb), facebook's [RocksDB](https://github.com/facebook/rocksdb), etc and provides a simple, clean API for caching with Time-to-Live (TTL) support.
 
 ## Features
 
@@ -14,11 +14,11 @@ LevelCache is a high-performance, ephemeral, embedded key-value caching library 
 
 ## Getting Started
 
-Getting started with levelcache is simple and a step by step guide is documented in [examples](examples) directory.
+Getting started with flashcache is simple and a step by step guide is documented in [examples](examples) directory.
 
 ## Makefile Targets
 
-- `all`: Builds the `liblevelcache.a` static library.
+- `all`: Builds the `libflashcache.a` static library.
 - `test`: Builds and runs the Google Test suite.
 - `benchmark`: Builds and runs the performance benchmark suite.
 - `clean`: Removes all build artifacts.

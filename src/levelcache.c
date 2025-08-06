@@ -29,7 +29,7 @@ void *cleanup_thread_function(void *arg) {
     return NULL;
 }
 
-LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level, engine_t engine_type) {
+LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t default_ttl_seconds, uint32_t cleanup_frequency_sec, int log_level, engine_t etype) {
     log_set_level(log_level);
     log_info("[open] Opening database at '%s'", path);
 
@@ -39,7 +39,14 @@ LevelCache* levelcache_open(const char *path, size_t max_memory_mb, uint32_t def
         return NULL;
     }
 
-    StorageEngine *engine = ALL_ENGINES[engine_type];
+    if (etype >= LIMIT && etype < 0) {
+        log_error("[open] Invalid engine type");
+        return NULL;
+    }
+
+    log_info("[open] Configured engine to %s", engine_names[etype]);
+
+    StorageEngine *engine = ALL_ENGINES[etype];
     
     cache->engine = engine;
     cache->index = NULL;

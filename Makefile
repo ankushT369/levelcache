@@ -2,7 +2,7 @@ CC = gcc
 CXX = g++
 CFLAGS = -Iinclude -Ivendor/leveldb/include -Ivendor/rocksdb/include -Ivendor/googletest/googletest/include -Ivendor/googletest/googletest -Ivendor/uthash/src -Ivendor/log/src -Wall -g
 CXXFLAGS = $(CFLAGS) -std=c++17 -isystem vendor/leveldb/third_party/benchmark/include
-LDFLAGS = -lstdc++ -pthread -lz -lbz2 -lsnappy -llz4 -lzstd
+LDFLAGS = -lstdc++ -pthread -lz -lbz2 -lsnappy -llz4 -lzstd -luring
 
 SRC_DIR = src
 LIB_DIR = lib
